@@ -63,6 +63,9 @@ int main(void)
     /* Stop Watchdog  */
     MAP_WDT_A_holdTimer();
 
+    /* Initializations */
+    CLK_48MHz();
+
     while(1)
     {
         
