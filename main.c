@@ -53,6 +53,8 @@
 *******************************************************************************/
 /* DriverLib Includes */
 #include "driverlib.h"
+#include "Display.h"
+#include "Common.h"
 
 /* Standard Includes */
 #include <stdint.h>
@@ -64,7 +66,17 @@ int main(void)
     MAP_WDT_A_holdTimer();
 
     /* Initializations */
-    CLK_48MHz();
+    Common_CLK_48MHz();
+    Display_Init();
+    Display_Backlight(true);
+
+    //Display_SetRotation(0);
+    Display_DrawRect(0, 0, DISPLAY_TFTWIDTH, DISPLAY_TFTHEIGHT, DISPLAY_YELLOW);
+
+    Display_DrawRect(25, 25, 50, 50, DISPLAY_RED);
+
+    Display_DrawVerticalLine(75, 25, 100, DISPLAY_BLUE);
+    Display_DrawPixel(80, 80, DISPLAY_BLUE);
 
     while(1)
     {
