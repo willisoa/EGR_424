@@ -53,7 +53,9 @@
 *******************************************************************************/
 /* DriverLib Includes */
 #include "driverlib.h"
+#include "ADC.h"
 #include "Display.h"
+#include "SoundVisualizer.h"
 #include "Common.h"
 
 /* Standard Includes */
@@ -69,17 +71,32 @@ int main(void)
     Common_CLK_48MHz();
     Display_Init();
     Display_Backlight(true);
+    Display_DrawRect(0, 0, DISPLAY_TFTWIDTH, DISPLAY_TFTHEIGHT, DISPLAY_BLACK);
+    ADC_Init();
 
-    //Display_SetRotation(0);
-    Display_DrawRect(0, 0, DISPLAY_TFTWIDTH, DISPLAY_TFTHEIGHT, DISPLAY_YELLOW);
-
-    Display_DrawRect(25, 25, 50, 50, DISPLAY_RED);
-
-    Display_DrawVerticalLine(75, 25, 100, DISPLAY_BLUE);
-    Display_DrawPixel(80, 80, DISPLAY_BLUE);
-
+    int last_width = 0;
     while(1)
     {
-        
+        if(ADC_ResultReady())
+        {
+            save_reading(ADC_GetResult());
+            ADC_ResultRead();
+        }
+
+        // Wait until a sample is ready
+        if(!is_sample_ready()) continue;
+
+        // Process the last buffer
+        int avg = handle_sample();
+        int width = (avg - 1900) * 160 / 500;
+
+        if(width >= last_width) {
+            Display_DrawRect(0, last_width, DISPLAY_TFTWIDTH, width - last_width, DISPLAY_WHITE);
+        }
+        else {
+            Display_DrawRect(0, width, DISPLAY_TFTWIDTH, last_width - width, DISPLAY_BLACK);
+        }
+
+        last_width = width;
     }
 }

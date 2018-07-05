@@ -2,11 +2,20 @@
  * Common.c
  *
  *  Created on: Jun 28, 2018
- *      Author: willi
+ *      Author: Zach Ash
+ *      Alec Willison
  */
 #include "Common.h"
 #include "Driverlib.h"
 
+/************************************************************
+ * Common_CLK_48MHz: Sets up the main clock to run at 48MHz,
+ * meaning the MCU runs at 1/48e6s per cycle. The core voltage
+ * level has to be set at 1 in order to run at 48MHz. As well
+ * MCLK is tied to the main crystal and runs at 48MHz. SMCLK
+ * is also tied to the main crystal, but runs at a divided rate
+ * of 12MHz.
+ ************************************************************/
 void Common_CLK_48MHz(void)
 {
     const int iMCLOCK_FREQ = 32000;
@@ -29,6 +38,11 @@ void Common_CLK_48MHz(void)
     MAP_CS_initClockSignal(CS_SMCLK, CS_HFXTCLK_SELECT, CS_CLOCK_DIVIDER_4);
 }
 
+/************************************************************
+ * Common_Delay_ms: Provides a blocking delay using
+ * __delay_cycles. Not intended to be used for more than
+ * small delays, initializations and debugging.
+ ************************************************************/
 void Common_Delay_ms(const int ms)
 {
     int i = 0;

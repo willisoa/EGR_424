@@ -2,7 +2,9 @@
  * Display.c
  *
  *  Created on: Jun 28, 2018
- *      Author: willi
+ *      Author: Zach Ash
+ *      Alec Willison
+ *      Modified code from Valvanoware
  */
 /* Includes */
 #include "Display.h"
@@ -15,29 +17,43 @@ void Display_Init(void);
 void Display_Backlight(bool turnOn);
 char Display_SendCommand(char data);
 char Display_SendData(char data);
-void Display_DrawRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color);
-void Display_DrawVerticalLine(int16_t x, int16_t y, int16_t h, uint16_t color);
+void Display_DrawRect(int16_t x, int16_t y, int16_t w,
+    int16_t h, uint16_t color);
+void Display_DrawVerticalLine(int16_t x, int16_t y,
+    int16_t h, uint16_t color);
 void Display_SetRotation(uint8_t m);
-void static Display_SetAddrWindow(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1);
+void static Display_SetAddrWindow(uint8_t x0, uint8_t y0,
+    uint8_t x1, uint8_t y1);
 void static Display_CommandList(const uint8_t *addr);
 void static Display_Color(uint16_t color);
 void Display_Delay1ms(int n);
 
-static uint8_t Rotation;           // 0 to 3
-static int16_t _width = DISPLAY_TFTWIDTH;   // this could probably be a constant, except it is used in Adafruit_GFX and depends on image rotation
+static uint8_t Rotation;
+static int16_t _width = DISPLAY_TFTWIDTH;
 static int16_t _height = DISPLAY_TFTHEIGHT;
 
 /* SPI Master Configuration Parameter */
 const eUSCI_SPI_MasterConfig spiMasterConfig = {
-        EUSCI_SPI_CLOCKSOURCE_SMCLK,                                // SMCLK Clock Source
-        12000000,                                                   // SMCLK Current SMCLK Freq
-        4000000,                                                     // SPICLK = 4MHz
-        EUSCI_SPI_MSB_FIRST,                                        // MSB First
-        EUSCI_SPI_PHASE_DATA_CAPTURED_ONFIRST_CHANGED_ON_NEXT,      // Phase
-        EUSCI_SPI_CLOCKPOLARITY_INACTIVITY_LOW,                     // low polarity
-        EUSCI_SPI_3PIN                                              // 3Wire SPI Mode
+        EUSCI_SPI_CLOCKSOURCE_SMCLK,                           // SMCLK Clock Source
+        12000000,                                              // SMCLK Current SMCLK Freq
+        4000000,                                               // SPICLK = 4MHz
+        EUSCI_SPI_MSB_FIRST,                                   // MSB First
+        EUSCI_SPI_PHASE_DATA_CAPTURED_ONFIRST_CHANGED_ON_NEXT, // Phase
+        EUSCI_SPI_CLOCKPOLARITY_INACTIVITY_LOW,                // low polarity
+        EUSCI_SPI_3PIN                                         // 3Wire SPI Mode
 };
 
+/************************************************************
+ * Display_Init: Initializes the display to run at 4MHz and
+ * initializes all necessary ports and pins as well as SPI
+ * on module B0.
+ * P6.6 is used for controling the LED backlight
+ * P3.6 is used for resetting the LED
+ * P5.0 is used for chip select for the SPI module
+ * P5.2 is used for the D/C for the SPI module
+ * P1.5 is used for SPI clk
+ * P1.6 is used for SPI MOSI
+ ************************************************************/
 void Display_Init(void)
 {
     /* Backlight direction */
@@ -63,11 +79,16 @@ void Display_Init(void)
     /* Enable SPI module */
     MAP_SPI_enableModule(EUSCI_B0_SPI_BASE);
 
+    //Commands for setting up the display. See display.h
     Display_CommandList(Rcmd1);
     Display_CommandList(Rcmd2);
     Display_CommandList(Rcmd3);
 }
 
+/************************************************************
+ * Display_Backlight: Allows the display LED to be turned on
+ * or off.
+ ************************************************************/
 void Display_Backlight(bool turnOn)
 {
     if(turnOn)
@@ -76,24 +97,14 @@ void Display_Backlight(bool turnOn)
         P6OUT &=~ BIT6;
 }
 
-void Display_DrawPixel(int16_t x, int16_t y, uint16_t color)
-{
-    Display_SetAddrWindow(x,y,x,y);
-    Display_Color(color);
-}
-
-void Display_DrawVerticalLine(int16_t x, int16_t y, int16_t h, uint16_t color) {
-    uint8_t hi = color >> 8, lo = color;
-
-    if((y+h-1) >= _height) h = _height-y;
-    Display_SetAddrWindow(x, y, x, y+h-1);
-
-    while (h--) {
-        Display_SendData(hi);
-        Display_SendData(lo);
-    }
-}
-
+/************************************************************
+ * Display_DrawRect: Draws a rectangle of the specified
+ * color starting at the specified location with
+ * the specified with and height. The function first sets
+ * the area to be drawn, then by sending data to the display,
+ * a pointer is incremented to go through each pixel and set
+ * its display RGB color (16 bit). From Valvanoware.
+ ************************************************************/
 void Display_DrawRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color)
 {
     uint8_t hi = color >> 8, lo = color;
@@ -110,36 +121,12 @@ void Display_DrawRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color
     }
 }
 
-void Display_SetRotation(uint8_t m)
-{
-    Display_SendCommand(DISPLAY_MADCTL);
-    Rotation = m % 4; // can't be higher than 3
-    switch (Rotation) {
-    case 0:
-        Display_SendData(MADCTL_MX | MADCTL_MY | MADCTL_BGR);
-        _width  = DISPLAY_TFTWIDTH;
-        _height = DISPLAY_TFTHEIGHT;
-        break;
-    case 1:
-        Display_SendData(MADCTL_MY | MADCTL_MV | MADCTL_BGR);
-        _width  = DISPLAY_TFTWIDTH;
-        _height = DISPLAY_TFTHEIGHT;
-         break;
-    case 2:
-        Display_SendData(MADCTL_BGR);
-        _width  = DISPLAY_TFTWIDTH;
-        _height = DISPLAY_TFTHEIGHT;
-        break;
-    case 3:
-        Display_SendData(MADCTL_MX | MADCTL_MV | MADCTL_BGR);
-        _width  = DISPLAY_TFTWIDTH;
-        _height = DISPLAY_TFTHEIGHT;
-        break;
-    }
-}
-
 ////////////// PRIVATE FUNCTIONS ///////////////////////
-
+/************************************************************
+ * Display_CommandList: Sets up and runs a number of
+ * initialization commands for the display. These are required
+ * or the display will not work. From Valvanoware.
+ ************************************************************/
 void static Display_CommandList(const uint8_t *addr) {
 
     uint8_t numCommands, numArgs;
@@ -163,36 +150,43 @@ void static Display_CommandList(const uint8_t *addr) {
     }
 }
 
+/************************************************************
+ * Display_SendCommand: Sends a command to the display. Commands
+ * tell the display what is shall do. The function waits for
+ * TX buf to be empty before sending the byte of data and waiting
+ * for a byte return of data from the MCU
+ ************************************************************/
 char Display_SendCommand(char data)
 {
-    /*char retVal;
-    P5OUT &=~ BIT2; //DC LOW
-    MAP_SPI_transmitData(EUSCI_B0_SPI_BASE , data);
-    retVal =  MAP_SPI_receiveData(EUSCI_B0_SPI_BASE);
-    return retVal;*/
-
-    while((UCB0IFG&0x0002)==0x0000){};    // wait until UCA3TXBUF empty
-    P5OUT &=~ BIT2;
+    while((UCB0IFG&0x0002)==0x0000){};    // wait until UCB0TXBUF empty
+    P5OUT &=~ BIT2; //Lo
     UCB0TXBUF = data;                        // command out
-    while((UCB0IFG&0x0001)==0x0000){};    // wait until UCA3RXBUF full
+    while((UCB0IFG&0x0001)==0x0000){};    // wait until UCB0RXBUF full
     return UCB0RXBUF;
 }
 
+/************************************************************
+* Display_SendData: Sends data to the display. Data is what is
+* written to display after command. The function waits for
+* TX buf to be empty before sending the byte of data and waiting
+* for a byte return of data from the MCU
+************************************************************/
 char Display_SendData(char data)
 {
-    /*char retVal;
-    P5OUT |= BIT2; //DC HI
-    MAP_SPI_transmitData(EUSCI_B0_SPI_BASE , data);
-    retVal =  MAP_SPI_receiveData(EUSCI_B0_SPI_BASE);
-    return retVal;*/
-
     while((UCB0IFG&0x0002)==0x0000){};    // wait until UCA3TXBUF empty
-    P5OUT |= BIT2;
+    P5OUT |= BIT2; //DC hi
     UCB0TXBUF = data;                        // command out
     while((UCB0IFG&0x0001)==0x0000){};    // wait until UCA3RXBUF full
     return UCB0RXBUF;
 }
 
+/************************************************************
+* Display_SetAddrWindow: Sets the area in the display that will
+* be drawn. This is convenient because the window will be
+* created, then a pointer is written to,to set the pixel color.
+* A series of data and commands are sent to the display
+* in order to set the window.
+************************************************************/
 void static Display_SetAddrWindow(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1) {
 
   Display_SendCommand(0x2A); // Column addr set
@@ -208,10 +202,4 @@ void static Display_SetAddrWindow(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1
   Display_SendData(y1);     // YEND
 
   Display_SendCommand(0x2C); // write to RAM
-}
-
-void static Display_Color(uint16_t color)
-{
-    Display_SendData((uint8_t)(color >> 8));
-    Display_SendData((uint8_t)color);
 }

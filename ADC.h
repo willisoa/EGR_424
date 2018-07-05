@@ -9,6 +9,8 @@
 #define ADC_H_
 
 void ADC_Init(void);
-float ADC_GetVoltage(void);
+int ADC_ResultReady();
+void ADC_ResultRead();
+int ADC_GetResult();
 
 #endif /* ADC_H_ */
